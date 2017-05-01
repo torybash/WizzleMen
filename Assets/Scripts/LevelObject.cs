@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Security.Cryptography;
 
-public class LevelObject : MonoBehaviour {
+public class LevelObject : MonoBehaviour, ILevelThing
+{
 
 
 	[SerializeField] private LevelObjectStats stats;
@@ -15,16 +16,22 @@ public class LevelObject : MonoBehaviour {
 
 	public LevelObjectStats Stats { get { return stats; }}
 
-	Coroutine routine;
+    public Vector3 OriginalPosition{
+        get; set;
+    }
+
+    Coroutine routine;
 
 
 	Collider2D[] groundColliders = new Collider2D[1];
 
+    private Vector3 position;
 
 	void Start(){
+        OriginalPosition = transform.localPosition;
 //		groundFilter = new ContactFilter2D();
 //		groundFilter.SetDepth
-	}
+    }
 
 	void FixedUpdate(){
 		if (routine != null) return;
@@ -36,8 +43,16 @@ public class LevelObject : MonoBehaviour {
 //			Debug.Log("colliders: " + groundColliders.Length);
 		}
 	}
-		
-	public bool CanBePushed(float xDir){
+
+
+    public void Reset()
+    {
+        if (routine != null) StopCoroutine(routine);
+        routine = null;
+        transform.localPosition = OriginalPosition;
+    }
+
+    public bool CanBePushed(float xDir){
 		//TODO!
 //		if (Physics2D.OverlapPoint(transform.position + Vector3.right * xDir))
 		return routine == null && Physics2D.OverlapPoint(transform.position + Vector3.right * xDir) == null;
