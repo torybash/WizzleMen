@@ -53,8 +53,6 @@ public class LevelObject : MonoBehaviour, ILevelThing
     }
 
     public bool CanBePushed(float xDir){
-		//TODO!
-//		if (Physics2D.OverlapPoint(transform.position + Vector3.right * xDir))
 		return routine == null && Physics2D.OverlapPoint(transform.position + Vector3.right * xDir) == null;
 	}
 
@@ -62,8 +60,19 @@ public class LevelObject : MonoBehaviour, ILevelThing
 		routine = StartCoroutine(AnimatePush(Vector3.right * xDir));
 	}
 
+	public bool CanBeLifted(){
+		return routine == null && Physics2D.OverlapPoint(transform.position + Vector3.up) == null;
+	}
+
+	public bool CanBePlaced(Vector3 pos){
+//		Debug.Log("CanBePlaced - xDir: "+ xDir + ", overlap: "+ Physics2D.OverlapPoint(transform.position + Vector3.down + Vector3.right * xDir));
+		return Physics2D.OverlapPoint(pos) == null;
+	}
+
 	private IEnumerator AnimateFall()
 	{
+		Debug.Log("AnimateFall");
+
 		var startPos = transform.position;
 		var goalPos = transform.position + Vector3.down;
 		var waitFixed = new WaitForFixedUpdate();
@@ -78,6 +87,8 @@ public class LevelObject : MonoBehaviour, ILevelThing
 
 	private IEnumerator AnimatePush(Vector3 dir)
 	{
+		Debug.Log("AnimatePush - dir: " + dir);
+
 		var startPos = transform.position;
 		var goalPos = transform.position + dir;
 		var waitFixed = new WaitForFixedUpdate();
@@ -95,5 +106,6 @@ public class LevelObject : MonoBehaviour, ILevelThing
 [Serializable]
 public class LevelObjectStats{
 	public bool isPushable;
+	public bool isLiftable;
 	public bool usesGravity;
 }

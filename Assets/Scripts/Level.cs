@@ -6,6 +6,7 @@ public class World{
 
 	public static float FallSpeed = 5f;
 	public static float PushSpeed = 2.5f;
+	public static float LiftSpeed = 2.5f;
 }
 
 public class Level : MonoBehaviour {
