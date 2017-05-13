@@ -2,12 +2,21 @@
 using System.Collections.Generic;
 using UnityEngine;
 using InControl;
+using UnityEditor;
+using UnityEngine.EventSystems;
 
-public class WizzPlayer : MonoBehaviour {
+public class WizzPlayer : MonoBehaviour, ILevelThing
+{
 
+	public enum State{
+		NORMAL,
+		CLIMBING_LADDER,
+		DEAD
+	}
 
 
 	[SerializeField] private float runSpeed;
+	[SerializeField] private float climbSpeed = 2f;
 	[SerializeField] private float jumpForce = 50f;
 	[SerializeField, Range(0f,1f)] private float airControl = 0.5f;
 
@@ -21,20 +30,26 @@ public class WizzPlayer : MonoBehaviour {
 
 	[SerializeField] private int playerNum;
 	
-	private Collider2D selfColl;
+	private Collider2D _selfColl;
 
-	private Rigidbody2D body;
+	private Rigidbody2D _body;
 
-	private Vector2 move;
-	private bool jumpPressed;
-	private bool pushPressed;
-	private bool lastLiftTapped;
-	private bool liftTapped;
+	private Vector2 _move;
+	private bool _jumpPressed;
+	private bool _pushPressed;
+	private bool _lastLiftTapped;
+	private bool _liftTapped;
 
-	private bool isGrounded;
+	private bool _isGrounded;
 
+	private State _state;
 
-	private Collider2D[] colliders = new Collider2D[1];
+	public Vector3 OriginalPosition
+	{
+		get; set;
+	}
+
+	private Collider2D[] _colliders = new Collider2D[4];
 
 	[SerializeField] private string currentRoutineName;
 	private Coroutine _routine;
@@ -43,31 +58,32 @@ public class WizzPlayer : MonoBehaviour {
 		set{ _routine = value; currentRoutineName = value == null ? "NONE" : value.ToString();} 
 	}
 
-	private LevelObject liftedObject;
+	private LevelObject _liftedObj;
 
-	WaitForFixedUpdate waitFixed = new WaitForFixedUpdate();
+	private WaitForFixedUpdate _waitFixed = new WaitForFixedUpdate();
+
 
 	void Awake(){
-		selfColl = GetComponent<Collider2D>();
-		body = GetComponent<Rigidbody2D>();
+		_selfColl = GetComponent<Collider2D>();
+		_body = GetComponent<Rigidbody2D>();
 	}
 
 	void Update () {
 		var inputDevice = (InputManager.Devices.Count > playerNum) ? InputManager.Devices[playerNum] : null;
 
 		if (inputDevice == null){	
-			move.x = Input.GetAxisRaw("Horizontal");
-			move.y = Input.GetAxisRaw("Vertical");
-			jumpPressed = Input.GetKey(KeyCode.Space);
-			pushPressed = Input.GetKey(KeyCode.Z);
-			liftTapped = Input.GetKey(KeyCode.X);
+			_move.x = Input.GetAxisRaw("Horizontal");
+			_move.y = Input.GetAxisRaw("Vertical");
+			_jumpPressed = Input.GetKey(KeyCode.Space);
+			_pushPressed = Input.GetKey(KeyCode.Z);
+			_liftTapped = Input.GetKey(KeyCode.X);
 		}else{
-			move = inputDevice.Direction;
-			jumpPressed = inputDevice.Action1;
-			pushPressed = inputDevice.Action2;
-			if (!lastLiftTapped && inputDevice.Action3) 
-				liftTapped = true;
-			lastLiftTapped = inputDevice.Action3;
+			_move = inputDevice.Direction;
+			_jumpPressed = inputDevice.Action1;
+			_pushPressed = inputDevice.Action2;
+			if (!_lastLiftTapped && inputDevice.Action3) 
+				_liftTapped = true;
+			_lastLiftTapped = inputDevice.Action3;
 		}
 	}
 
@@ -75,52 +91,92 @@ public class WizzPlayer : MonoBehaviour {
 	{
 		if (routine != null) return;
 
-		//bool isNearLadder = selfColl.OverlapCollider(ladderFilter, colliders) > 0; //TODO!
-		
 
-		body.velocity = new Vector2(move.x * runSpeed * (isGrounded ? 1f : airControl), body.velocity.y);
 
-		if (Mathf.Abs(body.velocity.x) > 0)
-			transform.localScale = new Vector3(Mathf.Sign(body.velocity.x), transform.localScale.y, transform.localScale.z);
+		switch (_state) {
+		case State.NORMAL:
+			_body.gravityScale = 3f;
+			NormalMovement();
+			break;
+		case State.CLIMBING_LADDER:
+			_body.gravityScale = 0f;
+			LadderMovement();
+			break;
+		case State.DEAD:
 
-		if (isGrounded && jumpPressed && body.velocity.y == 0){
-			body.AddForce(Vector2.up * jumpForce);
-			jumpPressed = false;
+			break;
+		}
+			
+		_liftTapped = false;
+		_isGrounded = groundColl.OverlapCollider(groundFilter, _colliders) > 0;
+	}
+
+
+	public void Reset()
+	{
+		_state = State.NORMAL;
+	}
+
+	private void NormalMovement()
+	{
+		bool isNearLadder = _selfColl.OverlapCollider(ladderFilter, _colliders) > 0;
+		if (_liftedObj == null && _isGrounded && Mathf.Abs(_move.y) > 0 && isNearLadder){
+			var ladderTile = LevelHelper.ClosestCollider(this.transform.position, _colliders).GetComponent<LevelTile>();
+			routine = StartCoroutine(AnimateClimbLadder(ladderTile));
+			return;
 		}
 
-		bool hasFrontCollision = frontColl.OverlapCollider(frontFilter, colliders) > 0;
-		
+		_body.velocity = new Vector2(_move.x * runSpeed * (_isGrounded ? 1f : airControl), _body.velocity.y);
+
+		if (Mathf.Abs(_body.velocity.x) > 0)
+			transform.localScale = new Vector3(Mathf.Sign(_body.velocity.x), transform.localScale.y, transform.localScale.z);
+
+		if (_isGrounded && _jumpPressed && _body.velocity.y == 0){
+			_body.AddForce(Vector2.up * jumpForce);
+			_jumpPressed = false;
+		}
+
+		bool hasFrontCollision = frontColl.OverlapCollider(frontFilter, _colliders) > 0;
 
 		float xDir = Mathf.Sign(transform.localScale.x);
 
-		if (pushPressed){
-			var obj = colliders[0].GetComponent<LevelObject>();
-			if (isGrounded && hasFrontCollision && Mathf.Abs(body.velocity.x) > 0 && obj != null){
-//					Debug.Log("Collider: "+ colliders[0] + ", xDir: "+ xDir);
+		if (_pushPressed){
+			var obj = _colliders[0].GetComponent<LevelObject>();
+			if (_isGrounded && hasFrontCollision && Mathf.Abs(_body.velocity.x) > 0 && obj != null){
+				//					Debug.Log("Collider: "+ colliders[0] + ", xDir: "+ xDir);
 				if (obj.Stats.isPushable && obj.CanBePushed(xDir)){
 					obj.StartPush(xDir);
 					routine = StartCoroutine(AnimatePushObject(xDir * Vector3.right));
 				}
 			}
-		
-		}else if (liftTapped){
-			if (liftedObject == null){
-				var obj = colliders[0].GetComponent<LevelObject>();
-				if (isGrounded && obj != null && obj.Stats.isPushable && obj.CanBeLifted()){
-					liftedObject = obj;
-					routine = StartCoroutine(AnimateLiftObject());
+
+		}else if (_liftTapped){
+			if (_liftedObj == null){
+				var obj = _colliders[0].GetComponent<LevelObject>();
+				if (_isGrounded && obj != null && obj.Stats.isPushable && obj.CanBeLifted()){
+					routine = StartCoroutine(AnimateLiftObject(xDir, obj));
 				}
 			}else{
 				var goalPos = LevelHelper.RoundToTilePos((Vector2)this.transform.position + Vector2.right * xDir);
-				if (liftedObject.CanBePlaced(goalPos)){
-					routine = StartCoroutine(AnimatePlaceObject(goalPos));
+				if (_isGrounded && _liftedObj.CanBePlaced(goalPos)){
+					routine = StartCoroutine(AnimatePlaceObject(xDir, goalPos));
 				}
 			}
 		}
+	}
 
-		liftTapped = false;
+	private void LadderMovement()
+	{
+		bool isNearLadder = _selfColl.OverlapCollider(ladderFilter, _colliders) > 0;
 
-		isGrounded = groundColl.OverlapCollider(groundFilter, colliders) > 0;
+		if (isNearLadder || _move.y < 0)
+			_body.velocity = new Vector2(0, _move.y * climbSpeed);
+		else 
+			_body.velocity = new Vector2(0, 0);
+
+		if (Mathf.Abs(_move.x) > 0){
+			_state = State.NORMAL;
+		}
 	}
 
 
@@ -131,7 +187,7 @@ public class WizzPlayer : MonoBehaviour {
 		float t = 0;
 		while (this.transform.position != goalPos){
 			this.transform.position = Vector2.MoveTowards(this.transform.position, goalPos, Time.fixedDeltaTime * runSpeed);
-			yield return waitFixed;
+			yield return _waitFixed;
 		}
 	}
 
@@ -142,69 +198,91 @@ public class WizzPlayer : MonoBehaviour {
 		var startPos = (Vector2)this.transform.position;
 		var goalPos = startPos + dir;
 
-		body.velocity = Vector2.zero;
-		body.isKinematic = true;
+		_body.velocity = Vector2.zero;
+		_body.isKinematic = true;
 
 		float t = 0;
 		while (t < 1){
 			t = Mathf.Clamp01(t + Time.fixedDeltaTime * World.PushSpeed);
 			this.transform.position = Vector2.Lerp(startPos, goalPos, t);
-			yield return waitFixed;
+			yield return _waitFixed;
 		}
 
-		body.isKinematic = false;
+		_body.isKinematic = false;
 		routine = null;
 	}
 		
-	private IEnumerator AnimateLiftObject()
+	private IEnumerator AnimateLiftObject(float xDir, LevelObject obj)
 	{
-		Debug.Log("AnimateLiftObject");
+		Debug.Log("AnimateLiftObject - obj: " + obj);
 
-		body.velocity = Vector2.zero;
-		body.isKinematic = true;
+		_liftedObj = obj;
 
-		var tilePos = LevelHelper.RoundToTilePos(this.transform.position);
-		yield return StartCoroutine(AnimateMoveToPos(tilePos));
+		_body.velocity = Vector2.zero;
+		_body.isKinematic = true;
 
-		var startPos = liftedObject.transform.position;
-		var goalPos = this.transform.position + Vector3.up;
+		var liftTilePos = LevelHelper.RoundToTilePos(this.transform.position);
+		Debug.Log("this.transform.position: "+ this.transform.position.ToString("F2") + ", liftTilePos: "+ liftTilePos.ToString("F2"));
+		yield return StartCoroutine(AnimateMoveToPos(liftTilePos));
 
-		liftedObject.transform.SetParent(this.transform);
-		liftedObject.enabled = false;
+		var objStartPos = _liftedObj.transform.position;
+		var objGoalPos = this.transform.position + Vector3.up * 0.9f;
+
+		_liftedObj.transform.SetParent(this.transform);
+		_liftedObj.enabled = false;
 
 		float t = 0;
 		while (t < 1){
 			t = Mathf.Clamp01(t + Time.fixedDeltaTime * World.LiftSpeed);
-			liftedObject.transform.position = Vector2.Lerp(startPos, goalPos, t);
-			yield return waitFixed;
+			_liftedObj.transform.position = Vector2.Lerp(objStartPos, objGoalPos, t);
+			yield return _waitFixed;
 		}
 
-		body.isKinematic = false;
+		_body.isKinematic = false;
 		routine = null;
 	}
 
-	private IEnumerator AnimatePlaceObject(Vector2 goalPos)
+	private IEnumerator AnimatePlaceObject(float xDir, Vector2 goalPos)
 	{
-		body.velocity = Vector2.zero;
-		body.isKinematic = true;
+		_body.velocity = Vector2.zero;
+		_body.isKinematic = true;
 
 		var tilePos = LevelHelper.RoundToTilePos(this.transform.position);
 		yield return StartCoroutine(AnimateMoveToPos(tilePos));
 
-		liftedObject.transform.SetParent(null);
-		var startPos = liftedObject.transform.position;
+		_liftedObj.transform.SetParent(null);
+		var startPos = _liftedObj.transform.position;
 		Debug.Log("AnimatePlaceObject - startPos: "+ startPos.ToString("F2") + ", goalPos: " + goalPos.ToString("F2"));
 
 		float t = 0;
 		while (t < 1){
 			t = Mathf.Clamp01(t + Time.fixedDeltaTime * World.LiftSpeed);
-			liftedObject.transform.position = Vector2.Lerp(startPos, goalPos, t);
-			yield return waitFixed;
+			_liftedObj.transform.position = Vector2.Lerp(startPos, goalPos, t);
+			yield return _waitFixed;
 		}
-		liftedObject.enabled = true;
-		liftedObject = null;
+		_liftedObj.enabled = true;
+		_liftedObj = null;
 
-		body.isKinematic = false;
+		_body.isKinematic = false;
 		routine = null;
 	}
+
+	private IEnumerator AnimateClimbLadder(LevelTile ladderTile)
+	{
+		_body.velocity = Vector2.zero;
+		_body.isKinematic = true;
+
+		var tilePos = LevelHelper.RoundToTilePos(ladderTile.transform.position);
+		yield return StartCoroutine(AnimateMoveToPos(tilePos));
+
+		_state = State.CLIMBING_LADDER;
+		_body.isKinematic = false;
+		routine = null;
+	}
+
+
+
+
+
+
 }

@@ -49,6 +49,7 @@ public class Level : MonoBehaviour {
         {
             var player = players[i];
             player.transform.position = startPositions[i].position;
+			player.Reset();
         }
     }
 
