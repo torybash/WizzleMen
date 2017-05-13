@@ -19,6 +19,8 @@ public class LevelTile : MonoBehaviour, ILevelThing
 
     public void Reset()
     {
+        if (!Application.isPlaying) return;
+
         transform.localPosition = OriginalPosition;
     }
 
