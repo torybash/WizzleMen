@@ -62,10 +62,13 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 
 	private WaitForFixedUpdate _waitFixed = new WaitForFixedUpdate();
 
+	private Animator _anim;
+
 
 	void Awake(){
 		_selfColl = GetComponent<Collider2D>();
 		_body = GetComponent<Rigidbody2D>();
+		_anim = GetComponent<Animator>();
 	}
 
 	void Update () {
@@ -108,13 +111,13 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 		}
 			
 		_liftTapped = false;
-		_isGrounded = groundColl.OverlapCollider(groundFilter, _colliders) > 0;
 	}
 
 
 	public void Reset()
 	{
 		_state = State.NORMAL;
+		_anim.SetTrigger("Default");
 	}
 
 	private void NormalMovement()
@@ -128,8 +131,9 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 
 		_body.velocity = new Vector2(_move.x * runSpeed * (_isGrounded ? 1f : airControl), _body.velocity.y);
 
-		if (Mathf.Abs(_body.velocity.x) > 0)
+		if (Mathf.Abs(_body.velocity.x) > 0){
 			transform.localScale = new Vector3(Mathf.Sign(_body.velocity.x), transform.localScale.y, transform.localScale.z);
+		}
 
 		if (_isGrounded && _jumpPressed && _body.velocity.y == 0){
 			_body.AddForce(Vector2.up * jumpForce);
@@ -163,6 +167,11 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 				}
 			}
 		}
+
+		_isGrounded = groundColl.OverlapCollider(groundFilter, _colliders) > 0;
+
+		_anim.SetBool("IsGrounded", _isGrounded);
+		_anim.SetFloat("MoveSpeed", _move.x);
 	}
 
 	private void LadderMovement()
@@ -177,6 +186,12 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 		if (Mathf.Abs(_move.x) > 0){
 			_state = State.NORMAL;
 		}
+	}
+
+	public void ObjectSquish()
+	{
+		Debug.Log("ObjectSquish");
+		_anim.SetTrigger("Squish");
 	}
 
 
@@ -201,6 +216,8 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 		_body.velocity = Vector2.zero;
 		_body.isKinematic = true;
 
+		_anim.SetTrigger("Pushing");
+
 		float t = 0;
 		while (t < 1){
 			t = Mathf.Clamp01(t + Time.fixedDeltaTime * World.PushSpeed);
@@ -210,6 +227,8 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 
 		_body.isKinematic = false;
 		routine = null;
+
+		_anim.SetTrigger("Default");
 	}
 		
 	private IEnumerator AnimateLiftObject(float xDir, LevelObject obj)
@@ -265,6 +284,8 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 
 		_body.isKinematic = false;
 		routine = null;
+
+		_anim.SetTrigger("Default");
 	}
 
 	private IEnumerator AnimateClimbLadder(LevelTile ladderTile)

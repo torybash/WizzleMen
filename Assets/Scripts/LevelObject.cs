@@ -12,6 +12,7 @@ public class LevelObject : MonoBehaviour, ILevelThing
 
 	[SerializeField] private Collider2D groundColl;
 	[SerializeField] ContactFilter2D groundFilter;
+	[SerializeField] ContactFilter2D playerFilter;
 
 
 	public LevelObjectStats Stats { get { return stats; }}
@@ -23,7 +24,7 @@ public class LevelObject : MonoBehaviour, ILevelThing
     Coroutine routine;
 
 
-	Collider2D[] groundColliders = new Collider2D[1];
+	Collider2D[] colliders = new Collider2D[4];
 
     private Vector3 position;
 
@@ -37,10 +38,9 @@ public class LevelObject : MonoBehaviour, ILevelThing
 		if (routine != null) return;
 
 		if (stats.usesGravity){
-			if (groundColl.OverlapCollider(groundFilter, groundColliders) == 0){
+			if (groundColl.OverlapCollider(groundFilter, colliders) == 0){
 				routine = StartCoroutine(AnimateFall());
 			}
-//			Debug.Log("colliders: " + groundColliders.Length);
 		}
 	}
 
@@ -73,6 +73,13 @@ public class LevelObject : MonoBehaviour, ILevelThing
 	{
 		Debug.Log("AnimateFall");
 
+		if (groundColl.OverlapCollider(playerFilter, colliders) > 0){
+			foreach (var coll in colliders) {
+				if (coll != null)
+					coll.GetComponent<WizzPlayer>().ObjectSquish();
+			}
+		}
+			
 		var startPos = transform.position;
 		var goalPos = transform.position + Vector3.down;
 		var waitFixed = new WaitForFixedUpdate();
