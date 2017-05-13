@@ -5,11 +5,13 @@ using UnityEngine;
 
 public class LevelTile : MonoBehaviour, ILevelThing
 {
-    public Vector3 OriginalPosition
-    {
-        get; set;
-    }
+	public Vector3 OriginalPosition{
+		get; private set;
+	}
 
+	public Level Level{
+		get; private set;
+	}
 
     void Awake()
     {

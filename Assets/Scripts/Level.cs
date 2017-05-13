@@ -9,10 +9,9 @@ public class World{
 	public static float LiftSpeed = 2.5f;
 }
 
-public class Level : MonoBehaviour {
+public class Level : MonoBehaviour 
+{
 
-	//private LevelObject[] objects;
- //   private LevelTile[] tiles;
     private ILevelThing[] things;
 
     [SerializeField] //<--- TODO!
@@ -52,6 +51,10 @@ public class Level : MonoBehaviour {
 			player.Reset();
         }
     }
+
+	public void WonLevel(){
+		Debug.Log("WON!!!!!!!!!!!!!!");
+	}
 
 
     void Update()

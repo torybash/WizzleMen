@@ -28,8 +28,10 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 	[SerializeField] private Collider2D frontColl;
 	[SerializeField] private ContactFilter2D frontFilter;
 
-	[SerializeField] private int playerNum;
-	
+	[SerializeField] private int playerIdx;
+
+	public int PlayerIdx { get { return playerIdx; } }
+
 	private Collider2D _selfColl;
 
 	private Rigidbody2D _body;
@@ -44,9 +46,12 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 
 	private State _state;
 
-	public Vector3 OriginalPosition
-	{
-		get; set;
+	public Vector3 OriginalPosition{
+		get; private set;
+	}
+
+	public Level Level{
+		get; private set;
 	}
 
 	private Collider2D[] _colliders = new Collider2D[4];
@@ -72,7 +77,7 @@ public class WizzPlayer : MonoBehaviour, ILevelThing
 	}
 
 	void Update () {
-		var inputDevice = (InputManager.Devices.Count > playerNum) ? InputManager.Devices[playerNum] : null;
+		var inputDevice = (InputManager.Devices.Count > playerIdx) ? InputManager.Devices[playerIdx] : null;
 
 		if (inputDevice == null){	
 			_move.x = Input.GetAxisRaw("Horizontal");

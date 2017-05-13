@@ -18,8 +18,12 @@ public class LevelObject : MonoBehaviour, ILevelThing
 	public LevelObjectStats Stats { get { return stats; }}
 
     public Vector3 OriginalPosition{
-        get; set;
+        get; private set;
     }
+
+	public Level Level{
+		get; private set;
+	}
 
     Coroutine routine;
 
